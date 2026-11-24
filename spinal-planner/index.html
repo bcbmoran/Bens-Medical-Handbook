@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spinal recipe planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE clinical work tool, calm and exact
+   IDEA the drawing-up tray: ISO 26825 syringe labels (local anaesthetic grey, opioid blue) on a white theatre trolley
+   PICTURE the spinal syringe drawn large, filled to the planned volumes, above a dermatome strip marking the target block
+   COLOUR white trolley, near-black ink, LA grey #8a8f96, opioid blue #6ec1e4, one red #d6332b for red flags
+   TYPE Space Grotesk for figures and titles, Atkinson Hyperlegible for text
+   LAYOUT laptop: inputs left, live plan right (sticky); phone: title, plan, then inputs with a slim sticky dose bar */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0f1215);--ink:light-dark(#14171a,#eef1f4);--mute:light-dark(#5b6470,#a2abb6);--panel:light-dark(#f3f5f7,#181c21);--line:light-dark(#d9dee4,#2c333b);--la:#8a8f96;--op:#6ec1e4;--red:light-dark(#c62a22,#ff6b62);--warn:light-dark(#fdecea,#3a1715)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 "Atkinson Hyperlegible",system-ui,sans-serif;overflow-x:clip}
+h1,h2,.big{font-family:"Space Grotesk",system-ui,sans-serif;letter-spacing:-.02em}
+h1{font-size:clamp(30px,4vw,44px);line-height:1.05;margin:0 0 8px;text-wrap:balance}
+h2{font-size:20px;margin:0 0 10px}
+.band{padding:clamp(20px,3vw,40px) max(4vw,16px)}
+.wrap{max-width:1240px;margin:0 auto}
+.lede{color:var(--mute);max-width:68ch;margin:0}
+.caveat{margin-top:14px;padding:10px 14px;border-left:4px solid var(--red);background:var(--warn);max-width:80ch;font-size:15px}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:28px;align-items:start}
+form{display:grid;gap:18px}
+fieldset{border:1px solid var(--line);border-radius:10px;padding:14px 16px 16px;margin:0;background:var(--panel)}
+legend{font-weight:700;padding:0 6px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5em,1fr));gap:12px}
+label{display:grid;gap:4px;font-size:15px}
+input[type=number],select{font:inherit;font-size:16px;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--op);outline-offset:2px}
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(14em,1fr));gap:6px 14px}
+.chk{display:flex;gap:10px;align-items:center;min-height:44px;cursor:pointer}
+.chk input{width:22px;height:22px;accent-color:var(--ink);flex:none}
+.hint{font-size:13px;color:var(--mute)}
+.plan{position:sticky;top:16px;border:1px solid var(--line);border-radius:12px;padding:18px;background:var(--bg)}
+.fig{position:relative;height:150px}
+.fig>svg{position:absolute;inset:0;width:100%;height:100%}
+.derm{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:6px 0 16px}
+.derm div{text-align:center;padding:6px 0;border-radius:6px;background:var(--panel);font-size:14px;color:var(--mute)}
+.derm div.on{background:var(--ink);color:var(--bg);font-weight:700}
+.drugs{display:grid;gap:10px;margin-bottom:14px}
+.drug{display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.sw{width:14px;align-self:stretch;border-radius:4px}
+.dname{font-weight:700}
+.dsub{font-size:14px;color:var(--mute)}
+.big{font-size:clamp(24px,3vw,32px);font-weight:700;text-align:right;white-space:nowrap;line-height:1.1}
+.big small{display:block;font:14px "Atkinson Hyperlegible",sans-serif;color:var(--mute);letter-spacing:0}
+ul{margin:0;padding-left:20px}
+li{margin:3px 0}
+.flags li{color:var(--red)}
+.sec{margin-top:14px}
+.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+button{font:inherit;min-height:44px;padding:8px 16px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:var(--bg);cursor:pointer}
+button.ghost{background:transparent;color:var(--ink)}
+button:active{transform:translateY(1px)}
+.mini{display:none}
+footer{color:var(--mute);font-size:14px}
+footer a{color:inherit}
+@media(max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}.plan{position:static;order:-1}.mini{display:block;position:sticky;top:0;z-index:5;background:var(--ink);color:var(--bg);padding:10px 16px;font-weight:700;font-size:15px}}
+@media(prefers-reduced-motion:no-preference){.fill{transition:width .35s ease,x .35s ease}}
+</style>
+</head>
+<body>
+<div class="mini" id="mini" aria-live="polite"></div>
+<header class="band">
+  <div class="wrap">
+    <h1>Spinal recipe planner</h1>
+    <p class="lede">Enter the patient and what you need the block to do. It suggests a starting recipe and shows how each factor changed it.</p>
+    <p class="caveat"><strong>Teaching and planning aid only.</strong> These are heuristic ranges built from common UK practice, not a validated dosing model. Always check against your trust guideline and agree the final dose with your supervising anaesthetist.</p>
+  </div>
+</header>
+
+<main class="band" style="padding-top:0">
+  <div class="wrap grid">
+    <form id="f" autocomplete="off">
+      <fieldset>
+        <legend>Procedure</legend>
+        <label>Operation preset
+          <select id="proc"></select>
+        </label>
+        <p class="hint" id="procnote"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Patient</legend>
+        <div class="row">
+          <label>Age (years)<input type="number" id="age" min="16" max="105" value="72"></label>
+          <label>Height (cm)<input type="number" id="ht" min="120" max="215" value="168"></label>
+          <label>Weight (kg)<input type="number" id="wt" min="30" max="250" value="80"></label>
+        </div>
+        <p class="hint" id="bmi"></p>
+        <div class="checks">
+          <label class="chk"><input type="checkbox" id="preg">Pregnant (term)</label>
+          <label class="chk"><input type="checkbox" id="frail">Frail (CFS 5 or more)</label>
+          <label class="chk"><input type="checkbox" id="as">Fixed cardiac output (e.g. severe AS)</label>
+          <label class="chk"><input type="checkbox" id="osa">OSA or high respiratory risk</label>
+          <label class="chk"><input type="checkbox" id="ac">Anticoagulant or abnormal clotting</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>What the block needs to do</legend>
+        <div class="row">
+          <label>Target sensory level
+            <select id="blk">
+              <option value="0">Saddle (S2–S5)</option>
+              <option value="1">L1</option>
+              <option value="2">T10</option>
+              <option value="3">T6</option>
+              <option value="4">T4</option>
+            </select>
+          </label>
+          <label>Surgery length (min)<input type="number" id="dur" min="10" max="300" step="5" value="90"></label>
+          <label>Post-op analgesia
+            <select id="post">
+              <option value="none">None needed</option>
+              <option value="short">Short (2–4 h)</option>
+              <option value="long">Long (12–24 h)</option>
+            </select>
+          </label>
+        </div>
+        <label class="chk"><input type="checkbox" id="day">Day case, needs to mobilise and go home today</label>
+      </fieldset>
+    </form>
+
+    <section class="plan" aria-live="polite">
+      <h2>Suggested starting recipe</h2>
+      <div class="fig"><svg id="syr" role="img" aria-label="Spinal syringe filled to planned volumes"></svg></div>
+      <div class="derm" id="derm"><div>Saddle</div><div>L1</div><div>T10</div><div>T6</div><div>T4</div></div>
+      <div class="drugs" id="drugs"></div>
+      <div class="sec"><h2>Why this dose</h2><ul id="why"></ul></div>
+      <div class="sec" id="flagbox"><h2>Red flags</h2><ul class="flags" id="flags"></ul></div>
+      <div class="btns">
+        <button type="button" id="copy">Copy plan</button>
+        <button type="button" class="ghost" id="reset">Reset to preset</button>
+      </div>
+      <p class="hint" id="copied" aria-live="polite"></p>
+    </section>
+  </div>
+</main>
+
+<footer class="band">
+  <div class="wrap">
+    <p>Ranges based on: <a href="https://www.heeoe.hee.nhs.uk/sites/default/files/eaoag_quick_ref_guide_obs_final.pdf">EoE obstetric quick reference</a> · <a href="https://www.oaa-anaes.ac.uk/downloads/publications/oaa-commentary-on-alternatives-to-intrathecal-and-epidural-diamorphine-.pdf">OAA diamorphine alternatives</a> · <a href="https://www.nhfd.co.uk/20/hipfracturer.nsf/vwContent/asapReport/$file/onlineASAP.pdf">NHFD ASAP hip fracture standards</a> · <a href="https://www.medicines.org.uk/emc/product/15160/smpc">Prilotekal SmPC</a> · <a href="https://www.medicines.org.uk/emc/product/15158/smpc">Ampres SmPC</a>. The size of each adjustment (age, height, BMI, block level) is a rule of thumb, not taken from a single source.</p>
+  </div>
+</footer>
+
+<script>
+{
+const P={
+  cs:{n:'Caesarean section',blk:4,lo:11,hi:12.5,dur:60,post:'long',preg:true,note:'Phenylephrine infusion ready before the spinal goes in. Check the block to cold and light touch before incision.'},
+  hipfx:{n:'Hip fracture (frail, elderly)',blk:2,lo:7.5,hi:10,dur:75,post:'none',frailBase:true,note:'Lateral, bad hip down. Give a fascia iliaca or femoral block as well.'},
+  thr:{n:'Primary hip replacement',blk:2,lo:12.5,hi:15,dur:100,post:'long',note:'Plain (isobaric) bupivacaine is a common alternative here.'},
+  tkr:{n:'Primary knee replacement',blk:2,lo:12.5,hi:15,dur:100,post:'long',note:'Often combined with local infiltration analgesia by the surgeon.'},
+  turp:{n:'TURP or cystoscopy',blk:2,lo:10,hi:12.5,dur:60,post:'short',note:'TURP needs a T10 block to cover bladder distension.'},
+  hernia:{n:'Inguinal hernia, day case',blk:2,lo:10,hi:12.5,dur:45,post:'short',day:true,note:'Short-acting agents can speed up discharge.'},
+  scope:{n:'Knee arthroscopy, day case',blk:1,lo:7.5,hi:10,dur:30,post:'short',day:true,note:'A good case for chloroprocaine.'},
+  saddle:{n:'Perineal or perianal (saddle block)',blk:0,lo:5,hi:7.5,dur:30,post:'short',note:'Inject sitting and keep the patient sitting for 5–10 min.'}
+};
+const LV=['Saddle','L1','T10','T6','T4'];
+const $=id=>document.getElementById(id);
+$('proc').innerHTML=Object.entries(P).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('');
+const ids=['proc','age','ht','wt','preg','frail','as','osa','ac','blk','dur','post','day'];
+const get=()=>{const s={};for(const i of ids){const e=$(i);s[i]=e.type==='checkbox'?e.checked:e.value}return s};
+const set=s=>{for(const i of ids){if(s[i]===undefined)continue;const e=$(i);if(e.type==='checkbox')e.checked=!!s[i];else e.value=s[i]}};
+const applyPreset=k=>{const p=P[k];set({blk:p.blk,dur:p.dur,post:p.post,day:!!p.day,preg:!!p.preg})};
+const r1=x=>Math.round(x*10)/10;
+const fmt=x=>(Number.isInteger(r1(x))?r1(x).toFixed(0):r1(x).toFixed(1));
+
+function plan(s){
+  const p=P[s.proc],age=+s.age||0,ht=+s.ht||0,wt=+s.wt||0,bmi=ht?wt/((ht/100)**2):0;
+  const blk=+s.blk,dur=+s.dur||0,why=[],flags=[],drugs=[];
+  let post=s.post;
+  // Local anaesthetic choice
+  let la;
+  const short=s.day&&!s.preg&&blk<=2&&blk>=1;
+  if(short&&dur<=40){
+    let lo=40,hi=50;if(age>=75||s.frail){hi=40;why.push('Age 75 or over, or frail: chloroprocaine kept at 40 mg.')}
+    la={name:'Chloroprocaine 1% (Ampres)',conc:10,lo,hi,col:'var(--la)',sub:'Isobaric, 10 mg/ml. Licensed max 50 mg; lasts about 40–50 min'};
+    why.push('Day case of 40 min or less: chloroprocaine gives the fastest recovery and discharge.');
+  }else if(short&&dur<=100){
+    let lo=40,hi=60;if(age>=75||s.frail){hi=50;why.push('Age 75 or over, or frail: prilocaine kept to the lower end.')}
+    la={name:'Prilocaine 2% hyperbaric (Prilotekal)',conc:20,lo,hi,col:'var(--la)',sub:'20 mg/ml. Licensed max 80 mg; lasts about 100–130 min'};
+    why.push('Day case under 100 min: prilocaine wears off sooner than bupivacaine.');
+  }else{
+    let lo=p.lo,hi=p.hi,adj=0;
+    why.push(`${p.n} preset: base ${fmt(lo)}–${fmt(hi)} mg heavy bupivacaine.`);
+    const step=(blk-p.blk)*1.25;
+    if(step){adj+=step;why.push(`Target ${LV[blk]} instead of ${LV[p.blk]}: ${step>0?'+':''}${fmt(step)} mg.`)}
+    if(!p.frailBase){
+      if(age>=80){adj-=2;why.push('Age 80 or over: −2 mg (spread is more cephalad, more hypotension).')}
+      else if(age>=70){adj-=1;why.push('Age 70–79: −1 mg.')}
+      if(s.frail){adj-=1;why.push('Frailty: −1 mg.')}
+    }else if(age<70){why.push('Hip fracture base already assumes an elderly, frail patient. Younger patients may need the upper end.')}
+    if(ht&&ht<155){adj-=1;why.push('Height under 155 cm: −1 mg.')}
+    else if(ht>185){adj+=0.5;why.push('Height over 185 cm: +0.5 mg.')}
+    if(bmi>=40){adj-=1;why.push('BMI 40 or over: −1 mg (smaller CSF volume).')}
+    if(s.preg&&s.proc!=='cs'){adj-=2;why.push('Term pregnancy, non-caesarean: −2 mg (smaller CSF volume, more spread).')}
+    if(s.as){adj-=2;why.push('Fixed cardiac output: −2 mg, and titrate (see red flags).')}
+    lo=Math.max(5,lo+adj);hi=Math.min(20,Math.max(lo,hi+adj));
+    la={name:'Bupivacaine 0.5% heavy',conc:5,lo,hi,col:'var(--la)',sub:'Hyperbaric, 5 mg/ml. Licensed surgical range 7.5–20 mg; lasts about 2–3 h'};
+    if(lo<7.5)why.push('Below 7.5 mg is under the datasheet surgical range. That is normal for saddle and low-dose techniques, but confirm locally.');
+    if(dur>150)flags.push('Surgery over 2.5 h is longer than a single-shot bupivacaine spinal reliably lasts. Consider a CSE, or plan for GA.');
+    if(s.day)why.push('Day case but too long or high for short-acting agents: bupivacaine used. Expect a later discharge.');
+  }
+  drugs.push(la);
+  // Opioid
+  if(s.proc==='cs'||(s.preg&&blk>=3)){
+    drugs.push({name:'Diamorphine',lo:300,hi:300,unit:'mcg',col:'var(--op)',sub:'Volume depends on your local reconstitution. If unavailable: PF morphine 100 mcg + fentanyl 15 mcg',vol:null});
+    why.push('Caesarean section: diamorphine 300 mcg is the usual UK adjunct.');
+    if(s.osa)flags.push('OSA with intrathecal diamorphine: plan enhanced respiratory monitoring after surgery.');
+  }else{
+    if(post==='long'){
+      const why2=[];
+      if(age>=75)why2.push('age 75 or over');
+      if(s.frail||p.frailBase)why2.push('frailty');
+      if(s.osa)why2.push('OSA or respiratory risk');
+      if(s.day)why2.push('day case');
+      if(why2.length){post='short';why.push(`Long-acting opioid avoided (${why2.join(', ')}): fentanyl only.`)}
+      else{
+        const hi=age>=65?100:100,lo=age>=65?50:100;
+        drugs.push({name:'Morphine, preservative-free',lo,hi,unit:'mcg',col:'var(--op)',sub:'Check the ampoule strength. Some trusts use diamorphine 250–300 mcg instead',vol:null});
+        why.push(`Long post-op analgesia: PF morphine ${lo===hi?lo:lo+'–'+hi} mcg. Doses above 100 mcg add itch, nausea and retention.`);
+      }
+    }
+    if(post==='short'){
+      const f=(age>=75||s.frail||p.frailBase)?10:(s.osa?10:15);
+      const hi=f===10?15:20;
+      drugs.push({name:'Fentanyl',lo:f,hi,unit:'mcg',col:'var(--op)',sub:'50 mcg/ml. Improves block quality; lasts 2–4 h',conc:50});
+      why.push(`Fentanyl ${f}–${hi} mcg for intraoperative comfort and short analgesia.`);
+    }
+    if(post==='none'&&p.frailBase)why.push('Frail hip fracture: intrathecal opioid usually omitted. Rely on the nerve block.');
+  }
+  // Red flags
+  if(s.as)flags.push('Fixed cardiac output: a single-shot spinal can cause sudden hypotension. Discuss with a consultant before starting. Options include low-dose, CSE titration, arterial line or GA.');
+  if(s.ac)flags.push('Anticoagulant or abnormal clotting: check drug timings and platelets against Association of Anaesthetists or ASRA neuraxial guidance before any needle.');
+  if(s.preg&&s.proc!=='cs')flags.push('Pregnant, non-obstetric surgery: involve obstetric anaesthesia and plan fetal monitoring.');
+  if(bmi>=50)flags.push('BMI 50 or over: technically harder and spread is less predictable. Senior help and an ultrasound-guided approach are advisable.');
+  if(age&&age<18)flags.push('Under 18: outside this tool\'s scope.');
+  // Volumes
+  for(const d of drugs){
+    d.mid=(d.lo+d.hi)/2;
+    if(d.conc){const k=d.unit==='mcg'?1:1;d.vlo=d.lo/d.conc;d.vhi=d.hi/d.conc}
+  }
+  return {drugs,why,flags,bmi,blk};
+}
+
+function syringe(drugs){
+  const s=$('syr'),W=s.clientWidth||500,H=s.clientHeight||150;
+  const L=Math.min(80,W*.14),R=24,bw=W-L-R-40,by=H*.28,bh=H*.32,maxml=5;
+  const x0=L,px=ml=>Math.min(bw,ml/maxml*bw);
+  let x=x0,fills='';
+  const la=drugs[0],op=drugs.find(d=>d.unit==='mcg'&&d.vhi);
+  const laV=la.vhi?((la.vlo+la.vhi)/2):0;
+  fills+=`<rect class="fill" x="${x}" y="${by+3}" width="${px(laV)}" height="${bh-6}" fill="${'#8a8f96'}" rx="2"/>`;
+  x+=px(laV);
+  if(op){const ov=(op.vlo+op.vhi)/2;fills+=`<rect class="fill" x="${x}" y="${by+3}" width="${px(ov)}" height="${bh-6}" fill="#6ec1e4" rx="2"/>`;x+=px(ov)}
+  let ticks='';
+  const step=W<520?1:0.5;
+  for(let m=0;m<=maxml;m+=step){const tx=x0+px(m),maj=Number.isInteger(m);ticks+=`<line x1="${tx}" x2="${tx}" y1="${by}" y2="${by+(maj?14:8)}" stroke="currentColor" stroke-width="1"/>`;if(maj)ticks+=`<text x="${tx}" y="${by-8}" text-anchor="middle" font-size="13" fill="currentColor">${m}</text>`}
+  const tot=x-x0;
+  s.innerHTML=`
+  <g style="color:var(--mute)">
+    <rect x="${x0-L+8}" y="${by+bh*.38}" width="${L-14}" height="${bh*.24}" rx="2" fill="currentColor" opacity=".35"/>
+    <rect x="${x0-6}" y="${by-10}" width="6" height="${bh+20}" fill="currentColor"/>
+  </g>
+  <rect x="${x0}" y="${by}" width="${bw}" height="${bh}" rx="6" fill="none" stroke="var(--ink)" stroke-width="2"/>
+  ${fills}
+  <g style="color:var(--ink)">${ticks}</g>
+  <rect x="${x0+tot}" y="${by+2}" width="5" height="${bh-4}" fill="var(--ink)"/>
+  <line x1="${x0+tot+5}" x2="${x0+bw+30}" y1="${by+bh/2}" y2="${by+bh/2}" stroke="var(--ink)" stroke-width="4"/>
+  <rect x="${x0+bw+30}" y="${by-6}" width="8" height="${bh+12}" rx="2" fill="var(--ink)"/>
+  <text x="${x0}" y="${by+bh+28}" font-size="14" fill="var(--ink)" font-weight="700">${fmt(tot/bw*maxml)} ml total intrathecal volume (mid-range)${op?'':''}</text>`;
+}
+
+function render(){
+  const s=get(),r=plan(s);
+  $('procnote').textContent=P[s.proc].note;
+  $('bmi').textContent=r.bmi?`BMI ${r.bmi.toFixed(1)}`:'';
+  [...$('derm').children].forEach((d,i)=>d.classList.toggle('on',i===r.blk));
+  $('drugs').innerHTML=r.drugs.map(d=>{
+    const u=d.unit||'mg',dose=d.lo===d.hi?fmt(d.lo):`${fmt(d.lo)}–${fmt(d.hi)}`;
+    const vol=d.vhi?(d.vlo===d.vhi?`${fmt(d.vlo)} ml`:`${fmt(d.vlo)}–${fmt(d.vhi)} ml`):'volume: see note';
+    return `<div class="drug"><span class="sw" style="background:${d.col}"></span><div><div class="dname">${d.name}</div><div class="dsub">${d.sub}</div></div><div class="big">${dose} ${u}<small>${vol}</small></div></div>`}).join('');
+  $('why').innerHTML=r.why.map(w=>`<li>${w}</li>`).join('');
+  $('flags').innerHTML=r.flags.length?r.flags.map(w=>`<li>${w}</li>`).join(''):'<li style="color:var(--mute)">None from the inputs given.</li>';
+  const d0=r.drugs[0];
+  $('mini').textContent=`${d0.name.split(' (')[0]} ${fmt(d0.lo)}–${fmt(d0.hi)} mg`+(r.drugs[1]?` + ${r.drugs[1].name.split(',')[0]} ${r.drugs[1].lo===r.drugs[1].hi?r.drugs[1].lo:r.drugs[1].lo+'–'+r.drugs[1].hi} mcg`:'');
+  syringe(r.drugs);
+  try{localStorage.setItem('spinalPlanner',JSON.stringify(s))}catch(e){}
+  return r;
+}
+
+$('f').addEventListener('input',e=>{if(e.target.id==='proc')applyPreset(e.target.value);render()});
+$('f').addEventListener('submit',e=>e.preventDefault());
+$('reset').addEventListener('click',()=>{applyPreset($('proc').value);render()});
+$('copy').addEventListener('click',async()=>{
+  const s=get(),r=plan(s),p=P[s.proc];
+  const lines=[`Spinal plan (teaching aid, confirm with supervisor): ${p.n}`,`Patient: ${s.age} y, ${s.ht} cm, ${s.wt} kg, BMI ${r.bmi.toFixed(1)}`,`Target ${LV[r.blk]}, ${s.dur} min`,...r.drugs.map(d=>`- ${d.name}: ${d.lo===d.hi?fmt(d.lo):fmt(d.lo)+'–'+fmt(d.hi)} ${d.unit||'mg'}${d.vhi?` (${fmt(d.vlo)}–${fmt(d.vhi)} ml)`:''}`),...r.flags.map(f=>`! ${f}`)];
+  try{await navigator.clipboard.writeText(lines.join('\n'));$('copied').textContent='Plan copied.'}catch(e){$('copied').textContent='Copy was blocked here. Select the text above instead.'}
+});
+let saved=null;try{saved=JSON.parse(localStorage.getItem('spinalPlanner')||'null')}catch(e){}
+if(saved&&P[saved.proc])set(saved);else{$('proc').value='thr';applyPreset('thr')}
+const ro=new ResizeObserver(()=>render());ro.observe($('syr'));
+render();
+}
+</script>
+</body>
+</html>
